@@ -1,36 +1,38 @@
-
-const express = require('express');
+const express = require('express'); // Fixed: 'const' must be lowercase
 const SibApiV3Sdk = require('sib-api-v3-sdk');
 const cors = require('cors');
 
 const app = express();
 
-// Middleware
-app.use(cors());
+// Middleware - Optimized for Netlify/Frontend connection
+app.use(cors({
+    origin: '*', 
+    methods: ['GET', 'POST'],
+    allowedHeaders: ['Content-Type']
+}));
 app.use(express.json());
 
-// --- BREVO CONFIGURATION (SECURE) ---
+// --- BREVO CONFIGURATION ---
 const defaultClient = SibApiV3Sdk.ApiClient.instance;
 const apiKey = defaultClient.authentications['api-key'];
 
-// Render Dashboard mein iska naam 'BREVO_API_KEY' hona chahiye
+// Render Dashboard -> Environment Variables mein 'BREVO_API_KEY' set karein
 apiKey.apiKey = process.env.BREVO_API_KEY; 
 
 const apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
 
-// Root Route - Server status check karne ke liye
+// Root Route - To check if backend is alive
 app.get('/', (req, res) => {
     res.send(`
         <div style="font-family: sans-serif; text-align: center; margin-top: 50px;">
             <h1 style="color: #0092ff;">PharmPro Backend is Secure! ✅</h1>
-            <p style="color: #555;">Server is running and ready to send emails.</p>
+            <p style="color: #555;">Server is live and listening for requests.</p>
         </div>
     `);
 });
 
 /**
  * 1. Welcome Email API
- * Signup ke waqt user ko welcome karne ke liye
  */
 app.post('/api/welcome-email', async (req, res) => {
     const { email, userName } = req.body;
@@ -46,8 +48,8 @@ app.post('/api/welcome-email', async (req, res) => {
             <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
                 <div style="max-width: 600px; margin: auto; border: 1px solid #eee; padding: 20px;">
                     <h2 style="color: #2563eb;">Hello ${userName || 'User'}!</h2>
-                    <p>Welcome to <b>PharmPro</b>. Your professional pharmacy management account has been successfully created.</p>
-                    <p>You can now manage your inventory, track sales, and get real-time alerts.</p>
+                    <p>Welcome to <b>PharmPro</b>. Your pharmacy management account has been created successfully.</p>
+                    <p>Manage your inventory and track your sales with ease.</p>
                     <br>
                     <p style="font-size: 12px; color: #777;">Regards,<br>PharmPro Team</p>
                 </div>
@@ -58,23 +60,22 @@ app.post('/api/welcome-email', async (req, res) => {
 
     try {
         await apiInstance.sendTransacEmail(sendSmtpEmail);
-        console.log(`✅ Welcome mail sent to: ${email}`);
-        res.status(200).json({ success: true, message: "Welcome email sent" });
+        console.log(`✅ Welcome email sent to: ${email}`);
+        res.status(200).json({ success: true, message: "Email sent successfully" });
     } catch (error) {
-        console.error("❌ Brevo Welcome Error:", error.message);
+        console.error("❌ Brevo Error:", error.message);
         res.status(500).json({ success: false, error: error.message });
     }
 });
 
 /**
  * 2. Stock Alert API
- * Jab inventory 5 se kam ho to alert bhejta hai
  */
 app.post('/api/stock-alert', async (req, res) => {
     const { email, itemName, currentQty } = req.body;
 
     if (!email || !itemName) {
-        return res.status(400).json({ success: false, error: "Missing details" });
+        return res.status(400).json({ success: false, error: "Missing required fields" });
     }
 
     let sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
@@ -83,11 +84,10 @@ app.post('/api/stock-alert', async (req, res) => {
         <html>
             <body style="font-family: Arial, sans-serif; padding: 20px;">
                 <div style="background-color: #fff5f5; border-left: 5px solid #c53030; padding: 20px;">
-                    <h2 style="color: #c53030; margin-top: 0;">Critical Stock Warning!</h2>
-                    <p>This is an automated alert for your inventory.</p>
+                    <h2 style="color: #c53030; margin-top: 0;">Stock Warning!</h2>
                     <p>Item: <b style="font-size: 18px;">${itemName}</b></p>
                     <p>Current Quantity: <b style="color: #c53030;">${currentQty}</b></p>
-                    <p>Please restock this item immediately to avoid out-of-stock situations.</p>
+                    <p>Please restock immediately.</p>
                 </div>
             </body>
         </html>`;
@@ -97,14 +97,13 @@ app.post('/api/stock-alert', async (req, res) => {
     try {
         await apiInstance.sendTransacEmail(sendSmtpEmail);
         console.log(`⚠️ Alert sent for: ${itemName}`);
-        res.status(200).json({ success: true, message: "Stock alert sent" });
+        res.status(200).json({ success: true, message: "Alert sent" });
     } catch (error) {
         console.error("❌ Brevo Alert Error:", error.message);
         res.status(500).json({ success: false, error: error.message });
     }
 });
 
-// Port configuration
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`🚀 Secure Server running on port ${PORT}`);
